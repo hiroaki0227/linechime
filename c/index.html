@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>Linechime - prototype</title>
+<title>Linechime</title>
 <style>
 :root{
   /* 明暗の両方を自分で持っていることを宣言する。
@@ -302,7 +302,7 @@ a.plink{margin-top:10px}
     <button class="plink" id="buylink" data-t="buyTitle"></button>
     <!-- 外のブラウザで開く。アプリ側が自分のサイトだけを通す -->
     <a class="plink" data-t="privacy"
-       href="https://hiroaki0227.github.io/linechime/privacy.html"></a>
+       href="https://linechime.roomelstudio.com/privacy.html"></a>
   </nav>
 </div>
 
@@ -1473,7 +1473,7 @@ function diag(m){ diagMsg = m; }
 function updateDiag(){
   const d = document.getElementById('diag');
   const t = tk();
-  if (d) d.textContent = 'v8.1 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
+  if (d) d.textContent = 'v8.2 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
     ' ｜ 層' + (active+1) + ' ' + t.path.length + 'マス' + (t.isLoop ? '(輪)' : '') +
     ' ｜ 全' + tracks.map(x=>x.path.length).join('/') +
     ' ｜ 音 呼' + noteCalls + '/鳴' + notePlayed + (noteWhy ? '(' + noteWhy + ')' : '') +
@@ -2392,7 +2392,7 @@ $('buygo').onclick = () => {
    拡散が唯一の流入経路なのに、その入口を install の後ろに置いていた。
    リンクなら、押した瞬間にブラウザで鳴る。decodeWork は塊を長い順に試すので、
    URL ごと貼られても従来どおり読める（アプリ側の受け取りは改修不要）。 */
-const SHARE_URL = 'https://hiroaki0227.github.io/linechime/c/#';
+const SHARE_URL = 'https://linechime.roomelstudio.com/c/#';
 
 function openSend(){
   const code = encodeWork(snapshot());
