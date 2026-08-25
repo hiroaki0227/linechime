@@ -164,8 +164,12 @@ body.tools .stage{display:none}
 #menu button:active{background:transparent;opacity:1}
 #menu .sub{font-size:10px;color:var(--dim);letter-spacing:.18em;
   text-align:center;margin:14px 0 0;opacity:.6}
-.plink{display:block;text-align:center;margin-top:22px;font-size:10px;
-  color:var(--dim);letter-spacing:.16em;opacity:.45;text-decoration:none}
+.plink{display:block;width:100%;text-align:center;margin-top:22px;font-size:10px;
+  color:var(--dim);letter-spacing:.16em;opacity:.45;text-decoration:none;
+  border-color:transparent;background:transparent;padding:6px 0}
+.plink:active{background:transparent;opacity:.8}
+#buylink{margin-top:26px}
+a.plink{margin-top:10px}
 
 
 /* 形を選ぶ。1枚に1つ、指で捲る */
@@ -222,6 +226,24 @@ body.tools .stage{display:none}
   width:min(280px,78vw);display:flex;flex-direction:column;align-items:center;gap:12px}
 .askbox canvas{width:120px;height:120px;border-radius:12px}
 .asktx{margin:0;font-size:12.5px;color:var(--fg);text-align:center;letter-spacing:.06em}
+#rec{position:fixed;left:50%;top:14px;transform:translateX(-50%) translateY(-140%);
+  z-index:60;display:flex;align-items:center;gap:9px;padding:9px 15px;
+  background:var(--panel);border:1px solid var(--line);border-radius:999px;
+  box-shadow:0 4px 18px rgba(0,0,0,.14);opacity:0;pointer-events:none;
+  transition:transform .28s cubic-bezier(.2,.9,.3,1), opacity .28s}
+#rec.on{transform:translateX(-50%) translateY(0);opacity:1}
+#rec i{width:11px;height:11px;border-radius:50%;background:#d1443a;flex:0 0 auto;
+  animation:recblink 1s steps(2,end) infinite}
+/* 出来上がりは本体の目印の色（琥珀）。--g2 は緑ではなく煉瓦色で、
+   撮影中の赤とほとんど区別が付かなかった */
+#rec.fin i{background:var(--lit);animation:none}
+@keyframes recblink{50%{opacity:.25}}
+#rec b{font-size:13px;font-weight:400;letter-spacing:.04em;white-space:nowrap}
+#rec u{display:block;width:64px;height:4px;border-radius:2px;background:var(--line);
+  text-decoration:none;overflow:hidden;flex:0 0 auto}
+#rec.fin u{display:none}
+#rec s{display:block;height:100%;width:0;background:#d1443a;text-decoration:none;
+  transition:width .1s linear}
 .askrow{display:flex;gap:8px;width:100%}
 .shape{flex:0 0 auto;padding:10px 13px;display:flex;align-items:center;justify-content:center}
 .shape i{display:block;border:2px solid currentColor;border-radius:2px;opacity:.55}
@@ -275,6 +297,9 @@ body.tools .stage{display:none}
     <button data-go="free" data-t="draw"></button>
     <p class="sub"><button data-go="manual" data-t="howto" style="letter-spacing:.2em;
       font-size:11px;color:var(--dim);padding:6px 20px"></button></p>
+    <!-- 売り込みではなく出口。鍵を押した瞬間が本線で、これは取りこぼしを拾うためのもの。
+         買った人には出さない -->
+    <button class="plink" id="buylink" data-t="buyTitle"></button>
     <!-- 外のブラウザで開く。アプリ側が自分のサイトだけを通す -->
     <a class="plink" data-t="privacy"
        href="https://hiroaki0227.github.io/linechime/privacy.html"></a>
@@ -319,6 +344,9 @@ body.tools .stage{display:none}
       </div>
     </div>
   </div>
+
+  <!-- 撮影中の目印。**canvas の外に置く**（中に描くと動画に写り込む） -->
+  <div id="rec"><i></i><b id="recsec"></b><u><s id="recbar"></s></u></div>
 
   <!-- 送る／受け取る。親が隠れると丸ごと消えるので body の直下に置く -->
   <div id="send-w" class="sheet">
@@ -429,12 +457,14 @@ ja:{
   copied:'コピーしました', badCode:'このコードは読めません',
   shareTo:'アプリで送る',
   movie:'動画にする', movieRec:'撮っています', movieDone:'動画ができました',
+  movieSaved:'ダウンロードに保存しました',
   movieNo:'この端末では動画を作れません',
   buyTitle:'すべて解放する', buyGo:'解放する',
   buy1:'音色 10種', buy2:'気分 4種', buy3:'層を3つ重ねる',
   buy4:'細かいマスで描く', buy5:'作品を30個まで持つ',
   buySoon:'購入の用意はこれからです',
   buyWait:'持っているものを確かめています。少し待ってください',
+  buyDone:'解放されました。音色10種・気分4種・層3つ・細かいマス・作品30個が使えます',
   buyOwned:'すでに購入済みです。解放されているか確かめています',
   buyNet:'通信できませんでした。つながる場所で試してください',
   buyFail:'購入を完了できませんでした',
@@ -477,12 +507,14 @@ en:{
   copied:'Copied', badCode:"That code can't be read",
   shareTo:'Send',
   movie:'Make a video', movieRec:'Recording', movieDone:'Video ready',
+  movieSaved:'Saved to Downloads',
   movieNo:'This device cannot make videos',
   buyTitle:'Unlock everything', buyGo:'Unlock',
   buy1:'All 10 sounds', buy2:'All 4 moods', buy3:'Three layers at once',
   buy4:'The finer grid', buy5:'Keep up to 30 pieces',
   buySoon:'Purchasing is not wired up yet',
   buyWait:'Checking what you already have — one moment',
+  buyDone:'Unlocked. All ten sounds, four moods, three layers, the finer grid, and thirty pieces.',
   buyOwned:'You already own this. Restoring it now',
   buyNet:'No connection. Try again where you have one',
   buyFail:"The purchase couldn't be completed",
@@ -1439,7 +1471,7 @@ function diag(m){ diagMsg = m; }
 function updateDiag(){
   const d = document.getElementById('diag');
   const t = tk();
-  if (d) d.textContent = 'v7.8 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
+  if (d) d.textContent = 'v7.9 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
     ' ｜ 層' + (active+1) + ' ' + t.path.length + 'マス' + (t.isLoop ? '(輪)' : '') +
     ' ｜ 全' + tracks.map(x=>x.path.length).join('/') +
     ' ｜ 音 呼' + noteCalls + '/鳴' + notePlayed + (noteWhy ? '(' + noteWhy + ')' : '') +
@@ -1795,11 +1827,16 @@ const repaid = () => { PAID = billingOwned || debugPaid; };
 
 /* アプリ側の Billing から呼ばれる。判断はこちらに置き、あちらは知らせるだけ */
 window.onBillingState = (owned, price, known) => {
+  /* 「持っていない」と分かっていた状態から「持っている」へ変わったときだけ知らせる。
+     起動時の復元でも owned=true が来るので、そこで毎回言わないための条件。 */
+  const wasKnownFree = ownedKnown && !billingOwned;
   billingOwned = !!owned;
   priceText = price || '';
   if (known) ownedKnown = true;
+  if (wasKnownFree && billingOwned) tellUnlocked();
   repaid();
   paintBuy();
+  paintBuyLink();
   try {
     updateTimbreButtons(); updateScaleButtons();
     updateLayerButtons(); updateGrainButtons();
@@ -2299,6 +2336,19 @@ function tutorCheck(){
 
 /* ---- すべて解放 ----
    足りないものを押したときに、ここへ来る。何が手に入るのかを並べるだけ。 */
+/* 買った直後に一度だけ、何が増えたのかを伝える。
+   黙って解放されるだけだと、払ったものが何なのか分からない */
+function tellUnlocked(){
+  setText('buymsg', T('buyDone'));
+  try { say('buyDone'); } catch(e){}
+}
+
+/* 献立の解放の一行。買った人には出さない（払った人に売り続けない） */
+function paintBuyLink(){
+  const b = $('buylink');
+  if (b) b.style.display = PAID ? 'none' : 'block';
+}
+
 /* 値段は Play から来る。来るまでは値段を出さない（嘘の数字を出さない） */
 function paintBuy(){
   const b = $('buygo');
@@ -2318,6 +2368,7 @@ function openBuy(){
   $('buy-w').classList.add('show');
 }
 $('buyclose').onclick = () => $('buy-w').classList.remove('show');
+$('buylink').onclick = ev => { ev.stopPropagation(); openBuy(); };
 $('buygo').onclick = () => {
   if (!(window.AndroidBilling && typeof window.AndroidBilling.buy === 'function')){
     setText('buymsg', T('buySoon'));       // ブラウザで開いているとき
@@ -2454,7 +2505,7 @@ function startRec(){
     const st = new MediaStream([...vs.getVideoTracks(), ...tap.stream.getAudioTracks()]);
     recChunks = [];
     recorder = new MediaRecorder(st, {mimeType: REC_MIME, videoBitsPerSecond: 2500000});
-  } catch(e){ say('movieNo'); return false; }
+  } catch(e){ $('rec').classList.remove('on'); say('movieNo'); return false; }
 
   recorder.ondataavailable = e => { if (e.data && e.data.size) recChunks.push(e.data); };
   recorder.onstop = () => {
@@ -2467,13 +2518,17 @@ function startRec(){
   };
   recorder.start();
 
-  const sec = recSeconds();
-  let left = Math.ceil(sec);
-  setText('msg', T('movieRec') + ' ' + left);
-  recTick = setInterval(() => {
-    left--;
-    if (left > 0) setText('msg', T('movieRec') + ' ' + left);
-  }, 1000);
+  const sec = recSeconds(), t0 = performance.now();
+  const bar = $('recbar'), lab = $('recsec'), box = $('rec');
+  box.classList.remove('fin'); box.classList.add('on');
+  lab.textContent = T('movieRec') + ' ' + Math.ceil(sec);
+  bar.style.width = '0%';
+  recTick = setInterval(() => {                 // 帯は canvas の外なので動画には写らない
+    const k = Math.min(1, (performance.now() - t0) / (sec * 1000));
+    bar.style.width = (k * 100).toFixed(1) + '%';
+    const left = Math.ceil(sec - k * sec);
+    if (left > 0) lab.textContent = T('movieRec') + ' ' + left;
+  }, 100);
   recTimer = setTimeout(stopRec, sec * 1000);
   return true;
 }
@@ -2495,7 +2550,7 @@ function recDone(blob){
                                          blob.type, T('shareBody')); } catch(e){}
     };
     r.readAsDataURL(blob);
-    say('movieDone');
+    recFinish('movieDone');                     // 共有シートへ渡した
     return;
   }
   const url = URL.createObjectURL(blob);
@@ -2504,7 +2559,18 @@ function recDone(blob){
   a.download = 'linechime.' + (blob.type.indexOf('mp4') >= 0 ? 'mp4' : 'webm');
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 8000);
-  say('movieDone');
+  recFinish('movieSaved');                      // 端末のダウンロードへ落ちた
+}
+
+/* 出来上がったことを、消える表示ではなく帯そのもので伝える。
+   赤い点が緑に変わり、どこへ行ったかを出して、数秒たってから引く。 */
+function recFinish(key){
+  const box = $('rec'), lab = $('recsec');
+  box.classList.add('on', 'fin');
+  lab.textContent = T(key);
+  say(key);
+  clearTimeout(recFinish.t);
+  recFinish.t = setTimeout(() => box.classList.remove('on', 'fin'), 3600);
 }
 
 function setShape(k){
@@ -2568,6 +2634,7 @@ try {
   applyLang();
   paintMute();
   paintDiag();
+  paintBuyLink();
   load(DATA[0]);
   updateTimbreButtons();
   updateScaleButtons();
