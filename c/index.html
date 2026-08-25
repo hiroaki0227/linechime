@@ -223,6 +223,11 @@ body.tools .stage{display:none}
 .askbox canvas{width:120px;height:120px;border-radius:12px}
 .asktx{margin:0;font-size:12.5px;color:var(--fg);text-align:center;letter-spacing:.06em}
 .askrow{display:flex;gap:8px;width:100%}
+.shape{flex:0 0 auto;padding:10px 13px;display:flex;align-items:center;justify-content:center}
+.shape i{display:block;border:2px solid currentColor;border-radius:2px;opacity:.55}
+.shape.on i{opacity:1}
+#shsq i{width:19px;height:19px}
+#shv i{width:12px;height:21px}
 .askrow button{flex:1;font-size:12.5px;padding:11px 4px}
 #askyes{color:var(--g2);border-color:var(--g2)}
 
@@ -325,6 +330,12 @@ body.tools .stage{display:none}
         <button id="codecopy" data-t="copy"></button>
         <button id="codeshare" data-t="shareTo" style="display:none"></button>
       </div>
+      <!-- 撮る形。語を増やさないよう、四角と縦長の絵で選ばせる -->
+      <div class="askrow" id="shaperow" style="display:none">
+        <button id="shsq" class="shape on"><i></i></button>
+        <button id="shv" class="shape"><i></i></button>
+        <button id="codemovie" data-t="movie"></button>
+      </div>
     </div>
   </div>
 
@@ -414,9 +425,11 @@ ja:{
   del:'消す', cancel:'やめる', works:'描く', close:'閉じる',
   privacy:'プライバシーポリシー',
   share:'送る', recv:'受け取る', copy:'コピー', load:'読み込む',
-  codeHint:'この文字列を送ってください', pasteHint:'受け取ったコードを貼り付けてください',
+  codeHint:'このリンクを送ってください', pasteHint:'受け取ったコードを貼り付けてください',
   copied:'コピーしました', badCode:'このコードは読めません',
   shareTo:'アプリで送る',
+  movie:'動画にする', movieRec:'撮っています', movieDone:'動画ができました',
+  movieNo:'この端末では動画を作れません',
   buyTitle:'すべて解放する', buyGo:'解放する',
   buy1:'音色 10種', buy2:'気分 4種', buy3:'層を3つ重ねる',
   buy4:'細かいマスで描く', buy5:'作品を30個まで持つ',
@@ -460,9 +473,11 @@ en:{
   del:'Delete', cancel:'Cancel', works:'Draw', close:'Close',
   privacy:'Privacy Policy',
   share:'Share', recv:'Receive', copy:'Copy', load:'Load',
-  codeHint:'Send this text to a friend', pasteHint:'Paste the code you received',
+  codeHint:'Send this link to a friend', pasteHint:'Paste the code you received',
   copied:'Copied', badCode:"That code can't be read",
   shareTo:'Send',
+  movie:'Make a video', movieRec:'Recording', movieDone:'Video ready',
+  movieNo:'This device cannot make videos',
   buyTitle:'Unlock everything', buyGo:'Unlock',
   buy1:'All 10 sounds', buy2:'All 4 moods', buy3:'Three layers at once',
   buy4:'The finer grid', buy5:'Keep up to 30 pieces',
@@ -1424,7 +1439,7 @@ function diag(m){ diagMsg = m; }
 function updateDiag(){
   const d = document.getElementById('diag');
   const t = tk();
-  if (d) d.textContent = 'v7.7 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
+  if (d) d.textContent = 'v7.8 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
     ' ｜ 層' + (active+1) + ' ' + t.path.length + 'マス' + (t.isLoop ? '(輪)' : '') +
     ' ｜ 全' + tracks.map(x=>x.path.length).join('/') +
     ' ｜ 音 呼' + noteCalls + '/鳴' + notePlayed + (noteWhy ? '(' + noteWhy + ')' : '') +
@@ -2331,6 +2346,7 @@ function openSend(){
   if (!code){ say('empty'); return; }
   $('codeout').value = SHARE_URL + code;
   $('codeshare').style.display = canShareNative() ? 'block' : 'none';
+  $('shaperow').style.display = canRecord() ? 'flex' : 'none';
   $('send-w').classList.add('show');
 }
 $('sendclose').onclick = () => $('send-w').classList.remove('show');
@@ -2373,6 +2389,136 @@ function canShareNative(){
 $('codeshare').onclick = () => {
   try { window.AndroidShare.send(T('shareBody') + String.fromCharCode(10,10) + $('codeout').value); }
   catch(e){ say('badCode'); }
+};
+
+/* ---- 撮る ----
+   拡散の主戦場（X・TikTok）では、リンクは何も再生しない。足を止めさせるのは動画で、
+   ユーザーには自分の作品を動画にする手段が無かった。MEDIA.md の撮影手順は
+   端末の画面録画を人手でやる前提で、配る側（作者）にしか使えない。
+
+   MP4（H.264/AAC）で録る。X がそのまま受け付けるので変換が要らない。
+   古い WebView では作れないので、作れるときだけボタンを出す。 */
+const REC_AIM = 15;      // 狙う長さ（MEDIA.md「完成の瞬間 10〜15秒」）
+const REC_MAX = 60;      // 上限。押したまま忘れられないように
+
+/* 輪は繰り返す。一周の途中で切ると、TikTok やリールが動画を繰り返したとき継ぎ目が出る。
+   一本の輪なら一周の整数倍に合わせられる。
+   多層は周期が揃わない（実測：76マス/速さ100 で9.05秒、32/75 で5.08秒、12/140 で1.02秒。
+   4000周ぶん探しても揃う時刻が無かった＝「長回しに耐える」の裏返し）ので、合わせない。 */
+function recSeconds(){
+  const on = tracks.filter(t => t && t.path && t.path.length);
+  if (on.length !== 1 || !on[0].isLoop) return REC_AIM;
+  const lap = on[0].path.length / (SPEED * on[0].rate);
+  if (!(lap > 0.2)) return REC_AIM;
+  const n = Math.max(1, Math.round(REC_AIM / lap));
+  return Math.min(REC_MAX, lap * n);
+}
+const REC_MIME = ['video/mp4;codecs="avc1.42E01E,mp4a.40.2"', 'video/mp4',
+                  'video/webm;codecs="vp8,opus"', 'video/webm']
+  .find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || null;
+
+function canRecord(){
+  return !!(REC_MIME && cv && cv.captureStream && audio && master);
+}
+
+let recorder = null, recChunks = [], recTimer = null, recTick = null;
+let recShape = 'sq';                     // 'sq' = 盤のまま（X）／'v' = 9:16（TikTok・リール・ショート）
+
+/* 9:16 に組む。地の色は本体から取るので、明るい側でも暗い側でも合う。
+   盤は横いっぱいに置く（MEDIA.md「縦のまま撮る。あとで切らずに済む」）。 */
+function verticalStage(){
+  const oc = document.createElement('canvas');
+  oc.width = 720; oc.height = 1280;
+  const g2 = oc.getContext('2d');
+  const bg = (getComputedStyle(document.documentElement)
+                .getPropertyValue('--bg') || '#f3f1ec').trim();
+  let alive = true;
+  const paint = () => {
+    if (!alive) return;
+    g2.fillStyle = bg; g2.fillRect(0, 0, 720, 1280);
+    g2.drawImage(cv, 0, (1280 - 720) / 2, 720, 720);
+    requestAnimationFrame(paint);
+  };
+  paint();
+  return {canvas: oc, stop: () => { alive = false; }};
+}
+
+function startRec(){
+  if (!canRecord() || recorder) return false;
+  let tap, vs, stage = null;
+  try {
+    tap = audio.createMediaStreamDestination();
+    master.connect(tap);                 // 出口に枝を1本足すだけ。鳴っている音は触らない
+    if (recShape === 'v') stage = verticalStage();
+    vs = (stage ? stage.canvas : cv).captureStream(30);
+    const st = new MediaStream([...vs.getVideoTracks(), ...tap.stream.getAudioTracks()]);
+    recChunks = [];
+    recorder = new MediaRecorder(st, {mimeType: REC_MIME, videoBitsPerSecond: 2500000});
+  } catch(e){ say('movieNo'); return false; }
+
+  recorder.ondataavailable = e => { if (e.data && e.data.size) recChunks.push(e.data); };
+  recorder.onstop = () => {
+    try { master.disconnect(tap); } catch(e){}
+    try { if (stage) stage.stop(); } catch(e){}
+    try { vs.getTracks().forEach(t => t.stop()); } catch(e){}
+    const blob = new Blob(recChunks, {type: (REC_MIME.split(';')[0])});
+    recorder = null; recChunks = [];
+    recDone(blob);
+  };
+  recorder.start();
+
+  const sec = recSeconds();
+  let left = Math.ceil(sec);
+  setText('msg', T('movieRec') + ' ' + left);
+  recTick = setInterval(() => {
+    left--;
+    if (left > 0) setText('msg', T('movieRec') + ' ' + left);
+  }, 1000);
+  recTimer = setTimeout(stopRec, sec * 1000);
+  return true;
+}
+
+function stopRec(){
+  if (recTimer){ clearTimeout(recTimer); recTimer = null; }
+  if (recTick){ clearInterval(recTick); recTick = null; }
+  if (recorder && recorder.state !== 'inactive'){ try { recorder.stop(); } catch(e){} }
+}
+
+function recDone(blob){
+  /* アプリ側の受け口ができたらここを差し替える。
+     いまはブラウザで中身と重さを確かめるための出口。 */
+  
+  if (window.AndroidShare && typeof window.AndroidShare.sendFile === 'function'){
+    const r = new FileReader();
+    r.onload = () => {
+      try { window.AndroidShare.sendFile(String(r.result).split(',')[1],
+                                         blob.type, T('shareBody')); } catch(e){}
+    };
+    r.readAsDataURL(blob);
+    say('movieDone');
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'linechime.' + (blob.type.indexOf('mp4') >= 0 ? 'mp4' : 'webm');
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 8000);
+  say('movieDone');
+}
+
+function setShape(k){
+  recShape = k;
+  $('shsq').classList.toggle('on', k === 'sq');
+  $('shv').classList.toggle('on', k === 'v');
+}
+$('shsq').onclick = () => setShape('sq');
+$('shv').onclick  = () => setShape('v');
+
+$('codemovie').onclick = () => {
+  if (recorder){ stopRec(); return; }     // 撮っている最中なら、もう一度押して止める
+  $('send-w').classList.remove('show');   // 盤を見せる。撮られているものが見えないと不安になる
+  if (!startRec()) say('movieNo');
 };
 
 /* 買えなかった理由を伝える。黙って終わらせない */
