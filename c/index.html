@@ -458,6 +458,7 @@ ja:{
   shareTo:'アプリで送る',
   movie:'動画にする', movieRec:'撮っています', movieDone:'動画ができました',
   movieSaved:'ダウンロードに保存しました', movieSend:'渡しています',
+  movieGallery:'ギャラリーに保存しました',
   movieNo:'この端末では動画を作れません',
   buyTitle:'すべて解放する', buyGo:'解放する',
   buy1:'音色 10種', buy2:'気分 4種', buy3:'層を3つ重ねる',
@@ -508,6 +509,7 @@ en:{
   shareTo:'Send',
   movie:'Make a video', movieRec:'Recording', movieDone:'Video ready',
   movieSaved:'Saved to Downloads', movieSend:'Sending',
+  movieGallery:'Saved to your gallery',
   movieNo:'This device cannot make videos',
   buyTitle:'Unlock everything', buyGo:'Unlock',
   buy1:'All 10 sounds', buy2:'All 4 moods', buy3:'Three layers at once',
@@ -1471,7 +1473,7 @@ function diag(m){ diagMsg = m; }
 function updateDiag(){
   const d = document.getElementById('diag');
   const t = tk();
-  if (d) d.textContent = 'v7.9 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
+  if (d) d.textContent = 'v8.1 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
     ' ｜ 層' + (active+1) + ' ' + t.path.length + 'マス' + (t.isLoop ? '(輪)' : '') +
     ' ｜ 全' + tracks.map(x=>x.path.length).join('/') +
     ' ｜ 音 呼' + noteCalls + '/鳴' + notePlayed + (noteWhy ? '(' + noteWhy + ')' : '') +
@@ -2586,7 +2588,10 @@ function handToApp(blob){
       bar.style.width = (at / u8.length * 100).toFixed(1) + '%';
       if (at < u8.length){ setTimeout(step, 0); return; }   // 画面を固まらせない
       try {
-        recFinish(window.AndroidShare.shareFile(T('shareBody')) ? 'movieDone' : 'movieNo');
+        /* 受け口は "gallery"（残せた）／"ok"（共有だけ）／""（だめ）を返す。
+           古い端末はギャラリーへ置けない（権限を増やさないため）ので、そこは "ok" になる。 */
+        const r = String(window.AndroidShare.shareFile(T('shareBody')) || '');
+        recFinish(r === 'gallery' ? 'movieGallery' : (r ? 'movieDone' : 'movieNo'));
       } catch(e){ fail(); }
     };
     step();
@@ -2601,9 +2606,17 @@ function recFinish(key){
   box.classList.add('on', 'fin');
   lab.textContent = T(key);
   say(key);
-  clearTimeout(recFinish.t);
-  recFinish.t = setTimeout(() => box.classList.remove('on', 'fin'), 3600);
+  recArm();
 }
+function recArm(){
+  clearTimeout(recFinish.t);
+  recFinish.t = setTimeout(() => $('rec').classList.remove('on', 'fin'), 3600);
+}
+/* 共有シートが前に出ると WebView の時間が止まる。戻ったときに数え直さないと、
+   溜まっていたぶんが一気に流れて、「どこへ保存したか」を見せないまま消える。 */
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && $('rec').classList.contains('fin')) recArm();
+});
 
 function setShape(k){
   recShape = k;
