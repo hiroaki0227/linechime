@@ -457,7 +457,7 @@ ja:{
   copied:'コピーしました', badCode:'このコードは読めません',
   shareTo:'アプリで送る',
   movie:'動画にする', movieRec:'撮っています', movieDone:'動画ができました',
-  movieSaved:'ダウンロードに保存しました',
+  movieSaved:'ダウンロードに保存しました', movieSend:'渡しています',
   movieNo:'この端末では動画を作れません',
   buyTitle:'すべて解放する', buyGo:'解放する',
   buy1:'音色 10種', buy2:'気分 4種', buy3:'層を3つ重ねる',
@@ -507,7 +507,7 @@ en:{
   copied:'Copied', badCode:"That code can't be read",
   shareTo:'Send',
   movie:'Make a video', movieRec:'Recording', movieDone:'Video ready',
-  movieSaved:'Saved to Downloads',
+  movieSaved:'Saved to Downloads', movieSend:'Sending',
   movieNo:'This device cannot make videos',
   buyTitle:'Unlock everything', buyGo:'Unlock',
   buy1:'All 10 sounds', buy2:'All 4 moods', buy3:'Three layers at once',
@@ -2543,14 +2543,8 @@ function recDone(blob){
   /* アプリ側の受け口ができたらここを差し替える。
      いまはブラウザで中身と重さを確かめるための出口。 */
   
-  if (window.AndroidShare && typeof window.AndroidShare.sendFile === 'function'){
-    const r = new FileReader();
-    r.onload = () => {
-      try { window.AndroidShare.sendFile(String(r.result).split(',')[1],
-                                         blob.type, T('shareBody')); } catch(e){}
-    };
-    r.readAsDataURL(blob);
-    recFinish('movieDone');                     // 共有シートへ渡した
+  if (window.AndroidShare && typeof window.AndroidShare.openFile === 'function'){
+    handToApp(blob);
     return;
   }
   const url = URL.createObjectURL(blob);
@@ -2560,6 +2554,44 @@ function recDone(blob){
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 8000);
   recFinish('movieSaved');                      // 端末のダウンロードへ落ちた
+}
+
+/* 動画をアプリへ渡す。橋の上で一度に膨らませない。
+   60秒だと base64 で13MBを超えるので、小分けにして書き込ませる。
+   片は3の倍数にする（base64 は3バイト＝4文字なので、繋いでも崩れない）。 */
+function handToApp(blob){
+  const CH = 192000;                            // 3の倍数
+  const box = $('rec'), lab = $('recsec'), bar = $('recbar');
+  box.classList.remove('fin'); box.classList.add('on');
+  lab.textContent = T('movieSend');
+  bar.style.width = '0%';
+  const fail = () => { try { window.AndroidShare.cancelFile(); } catch(e){}
+                       recFinish('movieNo'); };
+  const r = new FileReader();
+  r.onerror = fail;
+  r.onload = () => {
+    let u8;
+    try { u8 = new Uint8Array(r.result); } catch(e){ fail(); return; }
+    try { if (!window.AndroidShare.openFile(blob.type)){ fail(); return; } }
+    catch(e){ fail(); return; }
+    let at = 0;
+    const step = () => {
+      const to = Math.min(u8.length, at + CH);
+      let raw = '';
+      for (let i = at; i < to; i += 0x8000)      // 一度に広げるとスタックが尽きる
+        raw += String.fromCharCode.apply(null, u8.subarray(i, Math.min(to, i + 0x8000)));
+      try { if (!window.AndroidShare.writeFile(btoa(raw))){ fail(); return; } }
+      catch(e){ fail(); return; }
+      at = to;
+      bar.style.width = (at / u8.length * 100).toFixed(1) + '%';
+      if (at < u8.length){ setTimeout(step, 0); return; }   // 画面を固まらせない
+      try {
+        recFinish(window.AndroidShare.shareFile(T('shareBody')) ? 'movieDone' : 'movieNo');
+      } catch(e){ fail(); }
+    };
+    step();
+  };
+  r.readAsArrayBuffer(blob);
 }
 
 /* 出来上がったことを、消える表示ではなく帯そのもので伝える。
