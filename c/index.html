@@ -419,14 +419,14 @@ a.plink{margin-top:10px}
       <button data-n="24" data-i="fine" data-t="fine"></button>
     </div>
     <div class="row" id="editrow">
-      <button id="undo" data-i="undo" data-t="undo"></button>
-      <button id="erase" data-i="cut" data-t="cut"></button>
       <button id="reset" data-i="clear" data-t="clear"></button>
     </div>
     
   </div>
 
   <div class="tabs">
+    <button id="undo" data-i="undo" data-t="undo"></button>
+    <button id="redo" data-i="redo" data-t="redo"></button>
     <button data-d="d-sound" data-i="wave" data-t="tone"></button>
     <button data-d="d-edit" data-i="pencil" data-t="edit"></button>
   </div>
@@ -447,7 +447,7 @@ ja:{
   mood:'気分', tone:'音色', layers:'層', edit:'編集',
   vol:'音量', rate:'速さ',
   coarse:'マスを粗く', fine:'マスを細かく',
-  undo:'1マス戻す', cut:'部分消し', clear:'全部消す',
+  undo:'戻す', redo:'やり直し', clear:'全部消す',
   mute:'音を止める', unmute:'音を出す',
   noFit:'この線は、粗い紙に入りません',
   del:'消す', cancel:'やめる', works:'描く', close:'閉じる',
@@ -486,7 +486,7 @@ ja:{
   dSound:'気分で音階が変わる。どれを選んでも濁らないようにしてある',
   dRate:'層ごとに変えると、輪が少しずつずれて重なる',
   dGrain:'あとから変えられる。線はそのまま移る（粗くは、入り切るときだけ）',
-  dCut:'触れたマスから先を切る',
+  dUndo:'一手ずつ戻る。長押しすると、続けて戻る',
   s0:'あかるい', s1:'せつない', s2:'南の島', s3:'おちつく',
   b0:'やわらかい', b1:'木琴', b2:'オルゴール', b3:'鉄琴', b4:'カリンバ',
   b5:'電子音', b6:'りん', b7:'紙', b8:'竹', b9:'風切り'
@@ -498,7 +498,7 @@ en:{
   mood:'Mood', tone:'Sound', layers:'Layers', edit:'Edit',
   vol:'Volume', rate:'Speed',
   coarse:'Coarser grid', fine:'Finer grid',
-  undo:'Undo one cell', cut:'Trim from here', clear:'Clear all',
+  undo:'Undo', redo:'Redo', clear:'Clear all',
   mute:'Mute', unmute:'Unmute',
   noFit:'This line is too big for the coarser grid',
   del:'Delete', cancel:'Cancel', works:'Draw', close:'Close',
@@ -537,7 +537,7 @@ en:{
   dSound:'Mood changes the scale. Whichever you pick, it stays in tune.',
   dRate:'Set it per layer and the loops drift against each other.',
   dGrain:'Change it any time; your line moves across (coarser only if it fits).',
-  dCut:'Cuts the line from the cell you touch.',
+  dUndo:'Steps back one move at a time. Press and hold to keep going.',
   s0:'Bright', s1:'Wistful', s2:'Island', s3:'Calm',
   b0:'Soft', b1:'Marimba', b2:'Music box', b3:'Glockenspiel', b4:'Kalimba',
   b5:'Blip', b6:'Bowl', b7:'Paper', b8:'Bamboo', b9:'Whoosh'
@@ -567,7 +567,7 @@ const ICON = {
   vol:'<path d="M4 9.5h3.2L12 5.6v12.8L7.2 14.5H4z"/><path d="M15.5 9.6a4 4 0 010 4.8"/><path d="M18 7.4a7.4 7.4 0 010 9.2"/>',
   rate:'<path d="M5 6.5l5 5.5-5 5.5"/><path d="M13 6.5l5 5.5-5 5.5"/>',
   undo:'<path d="M8.5 8L4.5 12l4 4"/><path d="M4.5 12h10a4.5 4.5 0 010 9h-2.5"/>',
-  cut:'<circle cx="6.4" cy="17.8" r="2.6"/><circle cx="17.6" cy="17.8" r="2.6"/><path d="M8.4 15.9L19 4.2"/><path d="M15.6 15.9L5 4.2"/>',
+  redo:'<path d="M15.5 8l4 4-4 4"/><path d="M19.5 12h-10a4.5 4.5 0 000 9h2.5"/>',
   clear:'<path d="M4.5 7h15"/><path d="M9.5 7V4.6h5V7"/><path d="M6.5 7l1 13h9l1-13"/>',
   mute:'<path d="M4 9.5h3.2L12 5.6v12.8L7.2 14.5H4z"/><path d="M16.5 10l4.5 4.5"/><path d="M21 10l-4.5 4.5"/>',
   plus:'<path d="M12 5.5v13"/><path d="M5.5 12h13"/>',
@@ -637,13 +637,13 @@ function load(shape){
   lit = [];
   updateLayerButtons();
   resetMixer();
-  erasing = false;
   /* 使えないものは出さない。なぞる画面には線の道具が無く、層も1本しか無い。
      空の棚を開かせたり、効かないつまみを触らせたりしない */
   const er = document.getElementById('editrow');
   if (er) er.style.display = freeMode ? 'flex' : 'none';
   const sd = $('send');
   if (sd) sd.style.display = freeMode ? 'block' : 'none';
+  ['undo','redo'].forEach(k => { const b = $(k); if (b) b.style.display = freeMode ? 'block' : 'none'; });
   const lineTab = document.querySelector('.tabs button[data-d=d-edit]');
   if (lineTab){
     lineTab.style.display = freeMode ? '' : 'none';
@@ -663,8 +663,6 @@ function load(shape){
   });
   const gr = $('grain');
   if (gr) gr.style.display = freeMode ? 'flex' : 'none';
-  const eb = document.getElementById('erase');
-  if (eb) eb.classList.remove('on');      // 絵は入れ替えない。状態は枠だけで示す
   setText('name', T(shape.free ? 'draw' : 'trace'));
   const mel = $('msg');
   if (mel){                              // 説明は用が済んだら消える。出しっぱなしは雑音
@@ -872,7 +870,7 @@ function startHint(t){
 let audio = null, master = null, muted = false;
 let lastSlot = {};   // 層ごとに独立して数える。共有すると層が音を奪い合う
 let phase = false;      // 位相ずらしモード
-let freeMode = false, isLoop = false, erasing = false;   // 自由に描くモードと、輪になっているか
+let freeMode = false, isLoop = false;   // 自由に描くモードと、輪になっているか
 /* 音階。どれも5音で構成する。7音にすると組み合わせによって濁り、
    「適当に描いても気持ちいい」という性質が壊れる。
    層ごとに変えられる。実測したところ、組み合わせのきつさは
@@ -1254,26 +1252,60 @@ function cellOf(ev){
 }
 /* 自由モード: 指の方へ1マスずつ線を伸ばす。同じマスは二度通らない（経路は一本道）。
    最後が始点の隣に来たら輪として閉じる。 */
-/* 1マス戻す。輪だった場合は輪が解ける */
-function undoCell(){
-  const t = tk();
-  if (!freeMode || !t.path.length) return;
-  t.path.pop();
-  if (t.isLoop){ t.isLoop = false; t.items = []; }
-  t.progress = Math.max(0, t.path.length - 1);
-  markCorners(t); refresh();
+/* ---- 取り消しとやり直し ----
+   描く・全部消す は、どちらも「線の末尾への変更」なので、
+   足し引きした分だけを覚えておけば戻せる（全体の複製は要らない）。
+   全部消すだけは末尾の話ではないので、そのときの姿を丸ごと覚える。 */
+const UNDO_MAX = 1000;
+let undoStack = [], redoStack = [];
+
+function opClear(){ undoStack = []; redoStack = []; paintUndo(); }
+
+function opPush(o){
+  undoStack.push(o);
+  if (undoStack.length > UNDO_MAX) undoStack.shift();
+  redoStack = [];                       // 新しく何かしたら、やり直しは消える
+  paintUndo();
 }
 
-/* 部分消し。経路は一本道なので、触れたマスより先を切り落とす */
-function truncateAt(cell){
-  const t = tk();
-  if (!freeMode) return;
-  const i = t.path.findIndex(p => p[0] === cell[0] && p[1] === cell[1]);
-  if (i < 0) return;
-  t.path = t.path.slice(0, i);
-  if (t.isLoop){ t.isLoop = false; t.items = []; }
+/* 末尾の足し引きを当てる。back=true なら逆向きに当てる */
+function opTail(o, back){
+  const t = tracks[o.i];
+  if (!t) return;
+  const add = back ? o.del : o.add;
+  const del = back ? o.add : o.del;
+  if (del) for (let k = 0; k < del.length; k++) t.path.pop();
+  if (add) add.forEach(c => t.path.push([c[0], c[1]]));
+  const wasLoop = t.isLoop;
+  t.isLoop = back ? !!o.lb : !!o.la;
   t.progress = Math.max(0, t.path.length - 1);
-  markCorners(t); refresh();
+  markCorners(t);
+  if (t.isLoop && !wasLoop) seedLoop(t);
+  if (!t.isLoop && wasLoop) t.items = [];
+}
+
+function opStep(from, to, back){
+  const o = from.pop();
+  if (!o) return;
+  if (o.snap){                          // 全部消す の取り消し
+    const now = snapshot();
+    applySnapshot(o.snap);
+    to.push({snap: now});
+  } else {
+    opTail(o, back);
+    to.push(o);
+  }
+  paintUndo();
+  refresh();
+}
+
+function doUndo(){ if (freeMode) opStep(undoStack, redoStack, true); }
+function doRedo(){ if (freeMode) opStep(redoStack, undoStack, false); }
+
+function paintUndo(){
+  const u = $('undo'), r = $('redo');
+  if (u) u.classList.toggle('off', !undoStack.length);
+  if (r) r.classList.toggle('off', !redoStack.length);
 }
 
 /* 輪ができたら、玉を等間隔に置く。鳴るのは1個だけで、残りは目のためのもの */
@@ -1291,7 +1323,6 @@ function extend(ev){
   const c0 = [Math.floor(fx), Math.floor(fy)];
   if (c0[0]<0 || c0[1]<0 || c0[0]>=N || c0[1]>=N) return;
   if (!t.path.length){ t.path.push(c0); markCorners(t); refresh(); return; }
-  if (erasing){ truncateAt(c0); return; }
   for (let guard=0; guard<4; guard++){
     const c = t.path[t.path.length-1];
     const dx = c0[0]-c[0], dy = c0[1]-c[1];
@@ -1304,7 +1335,9 @@ function extend(ev){
       const n = [c[0]+sx, c[1]+sy];
       if (n[0]<0||n[1]<0||n[0]>=N||n[1]>=N) continue;
       if (t.path.some(p => p[0]===n[0] && p[1]===n[1])) continue;
-      t.path.push(n); lit.push({c:n, a:1}); moved = true; break;
+      t.path.push(n); lit.push({c:n, a:1}); moved = true;
+      opPush({i: t.idx, add: [[n[0], n[1]]], lb: t.isLoop, la: t.isLoop});
+      break;
     }
     if (!moved) break;
   }
@@ -1327,6 +1360,8 @@ function extend(ev){
     const a = t.path[0], b = t.path[t.path.length-1];
     if (Math.abs(a[0]-b[0]) + Math.abs(a[1]-b[1]) === 1){
       t.isLoop = true;
+      const last = undoStack[undoStack.length - 1];
+      if (last && last.i === t.idx) last.la = true;   // この1マスで閉じた
       markCorners(t);
       seedLoop(t);
         }
@@ -1473,7 +1508,7 @@ function diag(m){ diagMsg = m; }
 function updateDiag(){
   const d = document.getElementById('diag');
   const t = tk();
-  if (d) d.textContent = 'v8.2 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
+  if (d) d.textContent = 'v8.5 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
     ' ｜ 層' + (active+1) + ' ' + t.path.length + 'マス' + (t.isLoop ? '(輪)' : '') +
     ' ｜ 全' + tracks.map(x=>x.path.length).join('/') +
     ' ｜ 音 呼' + noteCalls + '/鳴' + notePlayed + (noteWhy ? '(' + noteWhy + ')' : '') +
@@ -1491,29 +1526,29 @@ function refresh(){
   draw();
 }
 
-document.getElementById('undo').onclick = () => undoCell();
-document.getElementById('erase').onclick = e => {
-  erasing = !erasing;
-  e.currentTarget.classList.toggle('on', erasing);   // 状態は枠で示す。字は要らない
-};
-/* しまう動作が無い＝押して離れたら取り返せない。一度目で身構え、二度目で消す */
-let clearArm = false;
-document.getElementById('reset').onclick = e => {
-  if (!clearArm){
-    clearArm = true;
-    e.currentTarget.classList.add('on');
-    say('clearAsk');
-    clearTimeout(window._clearT);
-    window._clearT = setTimeout(() => {
-      clearArm = false; e.currentTarget.classList.remove('on');
-    }, 4000);
-    return;
-  }
-  clearArm = false;
-  e.currentTarget.classList.remove('on');
-  clearTimeout(window._clearT);
+/* 取り消せるようになったので、二度押しの確認はやめた。
+   押して、違ったら戻す。確認を求めるのは、戻せないときだけでよい */
+document.getElementById('reset').onclick = () => {
+  const before = snapshot();
   load(S);
+  opPush({snap: before});
 };
+/* 長押しで連続して戻す。遠くまで戻すのに何十回も叩かせないため。
+   押した瞬間に1回、押し続けたときだけ、少し待ってから繰り返す */
+function holdRepeat(btn, fn){
+  if (!btn) return;
+  let wait = null, rep = null;
+  const stop = () => { clearTimeout(wait); clearInterval(rep); wait = rep = null; };
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    fn();
+    wait = setTimeout(() => { rep = setInterval(fn, 50); }, 400);
+  });
+  ['pointerup','pointercancel','pointerleave'].forEach(k =>
+    btn.addEventListener(k, stop));
+}
+holdRepeat($('undo'), doUndo);
+holdRepeat($('redo'), doRedo);
 document.getElementById('mute').onclick = () => {
   initAudio(); muted = !muted;
   padLevel(muted ? 0.0001 : 0.05, 0.6);
@@ -1634,12 +1669,12 @@ function updateTimbreButtons(){
 }
 
 /* 引き出しは一度に1つだけ開く。全部見えていると盤が押し出される */
-document.querySelectorAll('.tabs button').forEach(b => {
+document.querySelectorAll('.tabs button[data-d]').forEach(b => {
   b.onclick = () => {
     const id = b.dataset.d;
     const open = document.getElementById(id).classList.contains('open');
     document.querySelectorAll('.drawer').forEach(d => d.classList.remove('open'));
-    document.querySelectorAll('.tabs button').forEach(o => o.classList.remove('on'));
+    document.querySelectorAll('.tabs button[data-d]').forEach(o => o.classList.remove('on'));
     if (!open){
       document.getElementById(id).classList.add('open');
       b.classList.add('on');
@@ -1730,6 +1765,7 @@ function openWork(w, slot){
   document.body.classList.remove('tutoring', 'tools');
   curSlot = slot;
   applySnapshot(w);
+  opClear();                 // 別の作品に移った
 }
 
 function openPicker(mode){
@@ -1787,6 +1823,7 @@ function openBoard(shape){
   leaveTitle();
   document.body.classList.remove('tutoring', 'tools');
   load(shape);
+  opClear();                 // 別の紙に移った。前の紙の操作は取り消せない
 }
 
 function openManual(){
@@ -2250,6 +2287,7 @@ function switchGrain(n){
   [...$('mixer').querySelectorAll('input')].forEach((e, i) => e.value = mx[i]);
   [...$('rates').querySelectorAll('input')].forEach((e, i) => e.value = rt[i]);
   updateScaleButtons(); updateTimbreButtons(); updateGrainButtons();
+  opClear();                 // マスの大きさが変わり、座標が移った
   refresh();
 }
 
@@ -2264,8 +2302,7 @@ const TOOLS = [
   {i:['wave'],             t:'tone',   d:'dSound', t2:'mood'},
   {i:['rate'],             t:'rate',   d:'dRate'},
   {i:['coarse','fine'],    t:'grain',  d:'dGrain'},
-  {i:['undo'],             t:'undo'},
-  {i:['cut'],              t:'cut',    d:'dCut'},
+  {i:['undo','redo'],      t:'redo',   d:'dUndo', t2:'undo'},
   {i:['clear'],            t:'clear',  d:'dClear'},
   {i:['vol'],              t:'mute'}
 ];
