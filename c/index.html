@@ -2765,3 +2765,22 @@ try {
 }
 tick();   // 起動処理が転んでも、描画ループだけは必ず動かす
 </script>
+
+<div id="webfoot">
+  <a href="/terms.html">利用規約 / Terms</a> ・
+  <a href="/privacy.html">プライバシー / Privacy</a>
+  <span>linechime.app@gmail.com</span>
+</div>
+<style>
+#getapp,#webfoot{display:none;position:fixed;left:50%;transform:translateX(-50%);
+  z-index:40;font:12px/1.7 system-ui,-apple-system,sans-serif;letter-spacing:.06em;
+  text-align:center;max-width:92vw}
+#getapp{bottom:56px;color:#8a5312;text-decoration:none;opacity:.55;padding:8px 14px;
+  border:1px solid rgba(138,83,18,.28);border-radius:999px;background:rgba(253,250,243,.82)}
+#getapp:active{opacity:.9}
+#webfoot{bottom:14px;font-size:11px;color:#79808e;opacity:.72}
+#webfoot a{color:#79808e;text-decoration:none;border-bottom:1px solid rgba(121,128,142,.3)}
+#webfoot span{display:block;margin-top:6px;opacity:.8}
+/* 盤の上には出さない。音を聞いている最中に看板を出す意味は無い */
+body.titling #getapp, body.titling #webfoot{display:block}
+</style>
