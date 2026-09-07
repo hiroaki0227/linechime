@@ -461,6 +461,9 @@ ja:{
   movieGallery:'ギャラリーに保存しました',
   movieNo:'この端末では動画を作れません',
   buyTitle:'すべて解放する', buyGo:'解放する',
+  webTitle:'続きは、アプリで', webLink:'アプリで手に入れる', webGo:'Google Play へ',
+  webSave:'作品を保存する', webMovie:'動画にする',
+  webSoon:'まもなく Google Play に出ます',
   buy1:'音色 10種', buy2:'気分 4種', buy3:'層を3つ重ねる',
   buy4:'細かいマスで描く', buy5:'作品を30個まで持つ',
   buySoon:'購入の用意はこれからです',
@@ -512,6 +515,9 @@ en:{
   movieGallery:'Saved to your gallery',
   movieNo:'This device cannot make videos',
   buyTitle:'Unlock everything', buyGo:'Unlock',
+  webTitle:'Continue in the app', webLink:'Get the app', webGo:'Open Google Play',
+  webSave:'Keep your pieces', webMovie:'Make videos',
+  webSoon:'Coming to Google Play soon',
   buy1:'All 10 sounds', buy2:'All 4 moods', buy3:'Three layers at once',
   buy4:'The finer grid', buy5:'Keep up to 30 pieces',
   buySoon:'Purchasing is not wired up yet',
@@ -1508,7 +1514,7 @@ function diag(m){ diagMsg = m; }
 function updateDiag(){
   const d = document.getElementById('diag');
   const t = tk();
-  if (d) d.textContent = 'v8.5 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
+  if (d) d.textContent = 'v8.6 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
     ' ｜ 層' + (active+1) + ' ' + t.path.length + 'マス' + (t.isLoop ? '(輪)' : '') +
     ' ｜ 全' + tracks.map(x=>x.path.length).join('/') +
     ' ｜ 音 呼' + noteCalls + '/鳴' + notePlayed + (noteWhy ? '(' + noteWhy + ')' : '') +
@@ -1837,7 +1843,15 @@ function openManual(){
 function goBack(){
   if (screen === 'board'){
     if (tutorStep >= 0){ showTitle(); return true; }
-    if (freeMode){ keepWork(); openPicker('works'); return true; }
+    if (freeMode){
+      if (WEB){                          // 預からないので、消える前に行き先を出す
+        const ink = hasInk(snapshot());
+        showTitle();
+        if (ink && !offered){ offered = true; openBuy(); }
+        return true;
+      }
+      keepWork(); openPicker('works'); return true;
+    }
     openPicker('trace');
     return true;
   }
@@ -1883,6 +1897,20 @@ window.onBillingState = (owned, price, known) => {
 };
 
 const FREE_SLOTS = 1, PAID_SLOTS = 30;
+/* ---- web に置いた版 ----
+   同じ HTML をウェブにも置いている。そちらは「触って音を聞く」ための場所で、
+   保存と動画（＝持ち帰るもの）は預からない。断るのではなく、Play へ送る。
+   共有だけは web でも開けておく。外へ名前を運ぶのはこれだけだから。 */
+const WEBCFG = /*__WEB__*/{play:"https://play.google.com/store/apps/details?id=com.hiroa.linechime", live:false};        // web.py がここに中身を入れる
+const WEB = !!WEBCFG;
+let offered = false;                   // 描いて離れたときの案内は、一度だけ
+
+if (WEB){
+  const t = document.querySelector('.buyttl'); if (t) t.dataset.t = 'webTitle';
+  const l = document.getElementById('buylink'); if (l) l.dataset.t = 'webLink';
+  const g = document.getElementById('buygo');   if (g) g.dataset.t = 'webGo';
+}
+
 const slots = () => (PAID ? PAID_SLOTS : FREE_SLOTS);
 
 /* ---- 無料で触れる範囲 ----
@@ -2059,13 +2087,13 @@ function readJSON(key, dflt){
 function writeJSON(key, val){
   try { localStorage.setItem(key, JSON.stringify(val)); } catch(e){}
 }
-const listSaves  = () => readJSON('trace_saves', []);
+const listSaves  = () => (WEB ? [] : readJSON('trace_saves', []));
 const putSaves   = a  => writeJSON('trace_saves', a);
 /* 「しまう」という動作は持たない。描いたものは全部その人の作品で、
    盤を離れれば残る。「しまった／しまっていない」という状態を作らないほうが、
    覚えることが減る。制限は作る側（＋を押すとき）で当てる。 */
 function keepWork(){
-  if (!freeMode) return;
+  if (!freeMode || WEB) return;
   const w = snapshot();
   const a = listSaves();
   if (curSlot >= 0 && curSlot < a.length){
@@ -2391,14 +2419,18 @@ function paintBuyLink(){
 /* 値段は Play から来る。来るまでは値段を出さない（嘘の数字を出さない） */
 function paintBuy(){
   const b = $('buygo');
-  if (b) b.textContent = T('buyGo') + (priceText ? '　' + priceText : '');
+  if (!b) return;
+  b.textContent = WEB ? T('webGo')
+    : T('buyGo') + (priceText ? '　' + priceText : '');
 }
 
 function openBuy(){
   paintBuy();
   const ul = $('buylist');
   ul.innerHTML = '';
-  ['buy1','buy2','buy3','buy4','buy5'].forEach(k => {
+  const keys = WEB ? ['webSave','webMovie','buy1','buy2','buy3','buy4']
+                   : ['buy1','buy2','buy3','buy4','buy5'];
+  keys.forEach(k => {
     const li = document.createElement('li');
     li.textContent = T(k);
     ul.appendChild(li);
@@ -2409,6 +2441,11 @@ function openBuy(){
 $('buyclose').onclick = () => $('buy-w').classList.remove('show');
 $('buylink').onclick = ev => { ev.stopPropagation(); openBuy(); };
 $('buygo').onclick = () => {
+  if (WEB){
+    if (!WEBCFG.live){ setText('buymsg', T('webSoon')); return; }
+    window.open(WEBCFG.play, '_blank', 'noopener');
+    return;
+  }
   if (!(window.AndroidBilling && typeof window.AndroidBilling.buy === 'function')){
     setText('buymsg', T('buySoon'));       // ブラウザで開いているとき
     return;
@@ -2664,6 +2701,7 @@ $('shsq').onclick = () => setShape('sq');
 $('shv').onclick  = () => setShape('v');
 
 $('codemovie').onclick = () => {
+  if (WEB){ $('send-w').classList.remove('show'); openBuy(); return; }
   if (recorder){ stopRec(); return; }     // 撮っている最中なら、もう一度押して止める
   $('send-w').classList.remove('show');   // 盤を見せる。撮られているものが見えないと不安になる
   if (!startRec()) say('movieNo');
@@ -2727,13 +2765,3 @@ try {
 }
 tick();   // 起動処理が転んでも、描画ループだけは必ず動かす
 </script>
-
-<!-- web only -->
-<a id="getapp" href="https://play.google.com/store/apps/details?id=com.hiroa.linechime" target="_blank" rel="noopener noreferrer">Google Play</a>
-<style>
-#getapp{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);
-  z-index:40;font:12px/1 system-ui,-apple-system,sans-serif;letter-spacing:.06em;
-  color:#8a5312;text-decoration:none;opacity:.55;padding:8px 14px;
-  border:1px solid rgba(138,83,18,.28);border-radius:999px;background:rgba(253,250,243,.82)}
-#getapp:active{opacity:.9}
-</style>
