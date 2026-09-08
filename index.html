@@ -1901,7 +1901,7 @@ const FREE_SLOTS = 1, PAID_SLOTS = 30;
    同じ HTML をウェブにも置いている。そちらは「触って音を聞く」ための場所で、
    保存と動画（＝持ち帰るもの）は預からない。断るのではなく、Play へ送る。
    共有だけは web でも開けておく。外へ名前を運ぶのはこれだけだから。 */
-const WEBCFG = /*__WEB__*/{play:"https://play.google.com/store/apps/details?id=com.hiroa.linechime", live:false};        // web.py がここに中身を入れる
+const WEBCFG = /*__WEB__*/{play:"https://play.google.com/store/apps/details?id=com.hiroa.linechime", live:true};        // web.py がここに中身を入れる
 const WEB = !!WEBCFG;
 let offered = false;                   // 描いて離れたときの案内は、一度だけ
 
@@ -2765,6 +2765,8 @@ try {
 }
 tick();   // 起動処理が転んでも、描画ループだけは必ず動かす
 </script>
+
+<a id="getapp" href="https://play.google.com/store/apps/details?id=com.hiroa.linechime" target="_blank" rel="noopener noreferrer">Google Play</a>
 
 <div id="webfoot">
   <a href="/terms.html">利用規約 / Terms</a> ・
