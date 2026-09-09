@@ -29,7 +29,8 @@ body{margin:0;background:var(--bg);color:var(--fg);
 :root{ --pt:0px; --pb:0px; }          /* 状態バンド・操作バンドの高さ。アプリ側が入れる */
 .wrap{max-width:520px;margin:0 auto;
   padding:calc(var(--pt) + 14px) 12px calc(var(--pb) + 12px);
-  display:flex;flex-direction:column;gap:8px;height:100vh}
+  display:flex;flex-direction:column;gap:8px;
+  height:100vh;height:100dvh}   /* iOS Safari は 100vh がツールバーぶん長い */
 .stage{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}
 .stage canvas{max-height:100%;width:auto;max-width:100%}
 .drawer{display:none;flex-direction:column;gap:7px;
@@ -1514,7 +1515,7 @@ function diag(m){ diagMsg = m; }
 function updateDiag(){
   const d = document.getElementById('diag');
   const t = tk();
-  if (d) d.textContent = 'v8.6 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
+  if (d) d.textContent = 'v8.7 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
     ' ｜ 層' + (active+1) + ' ' + t.path.length + 'マス' + (t.isLoop ? '(輪)' : '') +
     ' ｜ 全' + tracks.map(x=>x.path.length).join('/') +
     ' ｜ 音 呼' + noteCalls + '/鳴' + notePlayed + (noteWhy ? '(' + noteWhy + ')' : '') +
@@ -2766,23 +2767,24 @@ try {
 tick();   // 起動処理が転んでも、描画ループだけは必ず動かす
 </script>
 
-<a id="getapp" href="https://play.google.com/store/apps/details?id=com.hiroa.linechime" target="_blank" rel="noopener noreferrer">Google Play</a>
-
-<div id="webfoot">
-  <a href="/terms.html">利用規約 / Terms</a> ・
-  <a href="/privacy.html">プライバシー / Privacy</a>
-  <span>linechime.app@gmail.com</span>
+<div id="webbottom">
+  <a id="getapp" href="https://play.google.com/store/apps/details?id=com.hiroa.linechime" target="_blank" rel="noopener noreferrer">Google Play</a>
+  <div id="webfoot">
+    <a href="/terms.html">利用規約 / Terms</a> ・
+    <a href="/privacy.html">プライバシー / Privacy</a>
+    <span>linechime.app@gmail.com</span>
+  </div>
 </div>
 <style>
-#getapp,#webfoot{display:none;position:fixed;left:50%;transform:translateX(-50%);
-  z-index:40;font:12px/1.7 system-ui,-apple-system,sans-serif;letter-spacing:.06em;
-  text-align:center;max-width:92vw}
-#getapp{bottom:56px;color:#8a5312;text-decoration:none;opacity:.55;padding:8px 14px;
+#webbottom{display:none;position:fixed;left:0;right:0;bottom:12px;z-index:40;
+  flex-direction:column;align-items:center;gap:10px;text-align:center;
+  font:12px/1.7 system-ui,-apple-system,sans-serif;letter-spacing:.06em}
+/* 盤の上には出さない。音を聞いている最中に看板を出す意味は無い */
+body.titling #webbottom{display:flex}
+#getapp{color:#8a5312;text-decoration:none;opacity:.6;padding:8px 16px;
   border:1px solid rgba(138,83,18,.28);border-radius:999px;background:rgba(253,250,243,.82)}
 #getapp:active{opacity:.9}
-#webfoot{bottom:14px;font-size:11px;color:#79808e;opacity:.72}
+#webfoot{font-size:11px;line-height:1.9;color:#79808e;opacity:.72;max-width:92vw}
 #webfoot a{color:#79808e;text-decoration:none;border-bottom:1px solid rgba(121,128,142,.3)}
-#webfoot span{display:block;margin-top:6px;opacity:.8}
-/* 盤の上には出さない。音を聞いている最中に看板を出す意味は無い */
-body.titling #getapp, body.titling #webfoot{display:block}
+#webfoot span{display:block;margin-top:4px;opacity:.8}
 </style>
