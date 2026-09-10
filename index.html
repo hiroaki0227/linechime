@@ -1517,7 +1517,7 @@ function diag(m){ diagMsg = m; }
 function updateDiag(){
   const d = document.getElementById('diag');
   const t = tk();
-  if (d) d.textContent = 'v8.8 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
+  if (d) d.textContent = 'v8.9 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
     ' ｜ 層' + (active+1) + ' ' + t.path.length + 'マス' + (t.isLoop ? '(輪)' : '') +
     ' ｜ 全' + tracks.map(x=>x.path.length).join('/') +
     ' ｜ 音 呼' + noteCalls + '/鳴' + notePlayed + (noteWhy ? '(' + noteWhy + ')' : '') +
@@ -2703,8 +2703,19 @@ function recArm(){
 /* 共有シートが前に出ると WebView の時間が止まる。戻ったときに数え直さないと、
    溜まっていたぶんが一気に流れて、「どこへ保存したか」を見せないまま消える。 */
 document.addEventListener('visibilitychange', () => {
+  if (document.hidden) appSave();      // 離れる。預かってから止まる
   if (!document.hidden && $('rec').classList.contains('fin')) recArm();
 });
+
+/* 描いたまま離れたぶんを預かる。
+   **「戻る」を押したときにしか保存していなかった。**
+   ホームを押す・アプリを替える・画面が消える、のどれでも作品が消えていた。
+   Android では普通の操作なので、黙って失うのは許されない。
+   アプリ側の onPause からも呼ぶ（WebView が止まる前に確実に走らせるため）。 */
+function appSave(){
+  try { if (screen === 'board' && freeMode) keepWork(); } catch(e){}
+}
+window.appSave = appSave;
 
 function setShape(k){
   recShape = k;
