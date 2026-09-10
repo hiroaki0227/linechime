@@ -469,6 +469,7 @@ ja:{
   buy4:'細かいマスで描く', buy5:'作品を30個まで持つ',
   buySoon:'購入の用意はこれからです',
   buyWait:'持っているものを確かめています。少し待ってください',
+  buyReady:'確かめました。もう一度押してください',
   buyDone:'解放されました。音色10種・気分4種・層3つ・細かいマス・作品30個が使えます',
   buyOwned:'すでに購入済みです。解放されているか確かめています',
   buyNet:'通信できませんでした。つながる場所で試してください',
@@ -523,6 +524,7 @@ en:{
   buy4:'The finer grid', buy5:'Keep up to 30 pieces',
   buySoon:'Purchasing is not wired up yet',
   buyWait:'Checking what you already have — one moment',
+  buyReady:'Ready — tap Unlock again.',
   buyDone:'Unlocked. All ten sounds, four moods, three layers, the finer grid, and thirty pieces.',
   buyOwned:'You already own this. Restoring it now',
   buyNet:'No connection. Try again where you have one',
@@ -1515,7 +1517,7 @@ function diag(m){ diagMsg = m; }
 function updateDiag(){
   const d = document.getElementById('diag');
   const t = tk();
-  if (d) d.textContent = 'v8.7 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
+  if (d) d.textContent = 'v8.8 ｜ 作品' + listSaves().length + ' ｜ ' + (freeMode ? '自由に描く' : 'なぞる') +
     ' ｜ 層' + (active+1) + ' ' + t.path.length + 'マス' + (t.isLoop ? '(輪)' : '') +
     ' ｜ 全' + tracks.map(x=>x.path.length).join('/') +
     ' ｜ 音 呼' + noteCalls + '/鳴' + notePlayed + (noteWhy ? '(' + noteWhy + ')' : '') +
@@ -1872,6 +1874,7 @@ window.appBack = goBack;
 /* 解放されているか。買ったか（billingOwned）と、診断窓の切替（debugPaid）の和。
    診断窓は「持っていないのに有料の画面を見る」ためのものなので、
    買っていない状態を上書きできる必要がある。逆はしない。 */
+let waitingAnswer = false;      // 「確かめています」を出したまま答えを待っている
 let billingOwned = false, debugPaid = false, priceText = '';
 /* 「持っているか」の答えが返ってきたか。返るまでは買わせない。
    値段と持ち物は別々に返るので、値段だけ先に来た隙に
@@ -1887,6 +1890,10 @@ window.onBillingState = (owned, price, known) => {
   billingOwned = !!owned;
   priceText = price || '';
   if (known) ownedKnown = true;
+  if (known && waitingAnswer){        // 待たせた分の返事をする。黙って消さない
+    waitingAnswer = false;
+    setText('buymsg', T('buyReady'));
+  }
   if (wasKnownFree && billingOwned) tellUnlocked();
   repaid();
   paintBuy();
@@ -2437,6 +2444,7 @@ function openBuy(){
     ul.appendChild(li);
   });
   setText('buymsg', '');
+  waitingAnswer = false;
   $('buy-w').classList.add('show');
 }
 $('buyclose').onclick = () => $('buy-w').classList.remove('show');
@@ -2453,7 +2461,12 @@ $('buygo').onclick = () => {
   }
   /* 値段が来ていない＝Play に品物を訊けていない（未公開・圏外・Play が無い等）。
      押しても何も起きないボタンにしない */
-  if (!ownedKnown){ setText('buymsg', T('buyWait')); return; }   // 持ち物の答え待ち
+  if (!ownedKnown){                    // 持ち物の答え待ち。押された機会に繋ぎ直す
+    setText('buymsg', T('buyWait'));
+    waitingAnswer = true;
+    try { window.AndroidBilling.retry && window.AndroidBilling.retry(); } catch(e){}
+    return;
+  }
   if (!priceText){ setText('buymsg', T('buyNo')); return; }
   setText('buymsg', '');                   // 前の断り書きを残さない
   window.AndroidBilling.buy();
